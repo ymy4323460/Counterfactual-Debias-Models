@@ -296,7 +296,7 @@ def random_impression_list(context_dim=32, impression_len=10, sample_size=128, i
     return all_  # , user_feature_dict, item_feature_dict
 
 
-for sam in [10]:
+for sam in [50000]:
     for cdim in [32]:
         for gm in [0.5]:
             for bs in [0.5]:
