@@ -352,7 +352,6 @@ class DataLoad(data.Dataset):
         self.transforms = transforms.Compose([transforms.ToTensor()])
         self.propensity = propensity
         self.imputation = imputation
-        # print('xxxxxxxxxxxxxxxxxxxx', data_feature_path)
         self.data_feature_path = data_feature_path
         self.a_propensity = a_propensity
         self.mode = mode
@@ -384,12 +383,10 @@ class DataLoad(data.Dataset):
         if self.imputation is not None:#%min(len(self.imputation_list), len(self.user_item))
             imputation_data = torch.from_numpy(self.imputation_list[idx])
             if self.data_feature_path is not None:
-                #print('xxxxxxxxxxxxxxxxxxxx')
                 imputation_data[0], imputation_data[1], imputation_data[4], imputation_data[5] = torch.from_numpy(self.userfeature[int(imputation_data[0].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[1].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[4].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[5].numpy())])
             #print(imputation_data)
         '''
 
-#         print('xxxxxxxxxxxxxxxxxxxx', self.data_feature_path)
         data = torch.from_numpy(self.user_item[idx])
 #         self.negative_data=None
         if self.negative_sample:
@@ -403,7 +400,6 @@ class DataLoad(data.Dataset):
                 return imputation_data[0], imputation_data[1], imputation_data[2], imputation_data[3], imputation_data[4], imputation_data[5], imputation_data[6], imputation_data[7], propensity_data
             '''
             if self.data_feature_path is not None:
-#                 print('xxxxxxxxxxxxxxxxxxxx')
                 return torch.cat((torch.from_numpy(self.userfeature[int(data[0].numpy())]),
                                       torch.from_numpy(self.itemfeature[int(data[1].numpy())])), 0), torch.from_numpy(
                     self.itemfeature[int(data[1].numpy())]), data[2], data[3], propensity_data
@@ -419,7 +415,6 @@ class DataLoad(data.Dataset):
             '''
             # print(data[0])
             if self.data_feature_path is not None:
-#                 print('xxxxxxxxxxxxxxxxxxxx')
                 # print(data[0], data[1])
                 return torch.cat((torch.from_numpy(self.userfeature[int(data[0].numpy())]),
                                       torch.from_numpy(self.itemfeature[int(data[1].numpy())])), 0), torch.from_numpy(
@@ -451,7 +446,6 @@ class DataLoadPretrain(data.Dataset):
         self.propensity = propensity
         self.imputation = imputation
         self.pretrain_mode = pretrain_mode
-        # print('xxxxxxxxxxxxxxxxxxxx', data_feature_path)
         self.data_feature_path = data_feature_path
         if propensity is not None:
             self.propensity_list = fileread_propensity(propensity)
@@ -475,12 +469,10 @@ class DataLoadPretrain(data.Dataset):
         if self.imputation is not None:#%min(len(self.imputation_list), len(self.user_item))
             imputation_data = torch.from_numpy(self.imputation_list[idx])
             if self.data_feature_path is not None:
-                #print('xxxxxxxxxxxxxxxxxxxx')
                 imputation_data[0], imputation_data[1], imputation_data[4], imputation_data[5] = torch.from_numpy(self.userfeature[int(imputation_data[0].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[1].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[4].numpy())]), torch.from_numpy(self.userfeature[int(imputation_data[5].numpy())])
             #print(imputation_data)
         '''
 
-        # print('xxxxxxxxxxxxxxxxxxxx', self.data_feature_path)
         data = torch.from_numpy(self.user_item[idx])
 
         if self.propensity is not None:
@@ -491,7 +483,6 @@ class DataLoadPretrain(data.Dataset):
                 return imputation_data[0], imputation_data[1], imputation_data[2], imputation_data[3], imputation_data[4], imputation_data[5], imputation_data[6], imputation_data[7], propensity_data
             '''
             if self.data_feature_path is not None:
-                # print('xxxxxxxxxxxxxxxxxxxx')
                 if self.pretrain_mode == 'propensity':
                     return torch.from_numpy(np.concatenate((self.userfeature[int(data[0].numpy())], self.itemfeature[int(data[1].numpy())]), axis=0)), data[1], data[2], data[
                         3], propensity_data
@@ -504,10 +495,8 @@ class DataLoadPretrain(data.Dataset):
             if self.imputation is not None:
                 return imputation_data[0], imputation_data[1], imputation_data[2], imputation_data[3], imputation_data[4], imputation_data[5], imputation_data[6], imputation_data[7]
             '''
-            # print('xxxxxxxxxxxxxxxxxxxx')
             # print(data[0])
             if self.data_feature_path is not None:
-                # print('xxxxxxxxxxxxxxxxxxxx')
                 # print(data[0], data[1])
                 if self.pretrain_mode == 'propensity':
                     return torch.from_numpy(np.concatenate((self.userfeature[int(data[0].numpy())], self.itemfeature[int(data[1].numpy())]), axis=0)), data[1], data[2], data[3]
@@ -535,7 +524,7 @@ class DataLoad_Sample(data.Dataset):
             self.propensity_list = fileread_propensity(propensity)
         if imputation_model is not None:
             self.full_data = np.load(os.path.join('./', 'dataset', 'yahoo', 'full_data.txt.npy'))
-            print(self.full_data.shape)
+#             print(self.full_data.shape)
         if data_feature_path is not None:
             self.userfeature = np.load(os.path.join(data_feature_path, 'user_features.npy'), allow_pickle=True)
             self.itemfeature = np.load(os.path.join(data_feature_path, 'item_features.npy'), allow_pickle=True)
