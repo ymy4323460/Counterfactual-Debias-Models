@@ -1,4 +1,4 @@
-for dataset_id in nonlinearinvdata_25_32 nonlinearinvdata_50_32 # #nonliearlogitdata_10_32_0.5_0.5
+for dataset_id in nonlinearinvdata_50000_32 # nonliearlogitdata_50000_32_0.5_0.5
     do
     for down in gmfBPR MLP
         do

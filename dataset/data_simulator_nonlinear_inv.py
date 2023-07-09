@@ -8,40 +8,8 @@ import os
 def user_item_feature(context_dim=32, sample_size=128, item_size=100):
     x = np.random.uniform(-1, 1, (sample_size, context_dim))
     a = np.random.uniform(-1, 1, (item_size, context_dim))
-    # x = np.random.normal(loc=0.0, scale=1.0, size=(sample_size, context_dim))
-    # a = np.random.normal(loc=0.0, scale=1.0, size=(item_size, context_dim))
     return x, a
 
-
-# def linear_impression_list(context_dim=32, impression_len=8, sample_size=128, item_size=16, step=10, mode='dev'):
-#     x, a = user_item_feature(context_dim=context_dim, sample_size=sample_size, item_size=item_size)
-#     user_feature_dict = dict(zip([j for j in range(sample_size)], list(x)))
-#     item_feature_dict = dict(zip([j for j in range(item_size)], list(a)))
-#     np.save('./lineardata/user', x)
-#     np.save('./lineardata/item', a)
-#     np.save('./lineardata/user_features', user_feature_dict)
-#     np.save('./lineardata/item_features', item_feature_dict)
-#     all_ = None
-#     for i in range(step):
-#         pair_matrix = torch.from_numpy(np.dot(x, a.T) + np.random.normal(loc=0.0, scale=0.01, size=(sample_size, item_size)))
-#         value, index = torch.topk(pair_matrix, impression_len, dim=1, largest=True, sorted=True, out=None)
-#
-#         user_feedback = np.zeros([sample_size, impression_len])
-#         user_feedback[:, 0] = 1 #排序最高的为1
-#         impression_list = index.numpy()
-#         assert impression_list.shape == user_feedback.shape
-#         user_list = np.repeat(np.arange(sample_size).reshape([sample_size, 1]), impression_len, axis=1).reshape(-1,1)
-#         impression_list = impression_list.reshape(-1,1)
-#         impression_indicate = np.ones([sample_size, impression_len]).reshape(-1,1)
-#         user_feedback = user_feedback.reshape(-1,1)
-#         assert user_list.shape == impression_list.shape
-#         batch = np.concatenate((user_list, impression_list, user_feedback, impression_indicate), axis=1)
-#         if all_ is None:
-#             all_ = batch
-#         else:
-#             all_ = np.concatenate((all_, batch), axis=0)
-#     pd.DataFrame(all_).to_csv('./lineardata/{}/data_nonuniform.csv'.format(mode), header=False, index=False)
-#     return all_, user_feature_dict, item_feature_dict
 
 def get_impression_feature(x, parameters=None):
     item_feature_dict = np.load('./nonlinearinvdata_{}_{}/item_features.npy'.format(parameters[1], parameters[2]),
@@ -144,10 +112,10 @@ def get_feedbacks(x, y, threshold=None):
     return x
 
 
-def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128, item_size=32, step=10, mode='dev',
+def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128, item_size=32, mode='dev',
                               sample_num=50, policy='logit'):
-    sample_size = sample_num * 200
-    x, a = user_item_feature(context_dim=context_dim, sample_size=sample_num * 200, item_size=item_size)
+    sample_size = sample_num
+    x, a = user_item_feature(context_dim=context_dim, sample_size=sample_num, item_size=item_size)
     # if mode == 'train':
     #     x = np.load('./nonlinear{}data_{}_{}/user.npy'.format(policy, sample_num, context_dim), allow_pickle=True)
     #     # print(x)
@@ -220,9 +188,9 @@ def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128,
     return all_, user_feature_dict, item_feature_dict
 
 
-def random_impression_list(context_dim=32, impression_len=5, sample_size=128, item_size=32, step=10, mode='dev',
+def random_impression_list(context_dim=32, impression_len=5, sample_size=128, item_size=32, mode='dev',
                            policy='logit', sample_num=50):
-    sample_size = sample_num * 200
+    sample_size = sample_num
     x = np.load('./{}data_{}_{}/user.npy'.format(policy, sample_num, context_dim), allow_pickle=True)
     # print(x)
     a = np.load('./{}data_{}_{}/item.npy'.format(policy, sample_num, context_dim), allow_pickle=True)
@@ -235,16 +203,10 @@ def random_impression_list(context_dim=32, impression_len=5, sample_size=128, it
                                                    [[policy, sample_num, context_dim] for j in
                                                     range(sample_size * impression_len)]))).reshape(
             [sample_size, impression_len, context_dim])
-        # print(x.shape)
-        # 获得 result
+
         pair_matrix = np.array(list(map(nonlinear_reward_function, x, impression_information))).reshape(
             impression_list.shape)
-        # print(pair_matrix.shape, impression_list.shape)
-        # index = torch.topk(torch.from_numpy(pair_matrix), 1, dim=1, largest=True, sorted=True, out=None)[1].numpy()
         user_feedback = pair_matrix
-        # assert index.shape[0] == user_feedback.shape[0]
-
-        # user_feedback = np.array(list(map(get_feedbacks, user_feedback, index)))
 
         assert impression_list.shape == user_feedback.shape
         user_list = np.repeat(np.arange(sample_size).reshape([sample_size, 1]), impression_len, axis=1).reshape(-1, 1)
@@ -268,8 +230,9 @@ def random_impression_list(context_dim=32, impression_len=5, sample_size=128, it
     return all_  # , user_feature_dict, item_feature_dict
 
 
-for sam in [25, 50]:
-    for cdim in [16, 32]:
-        logit_impression_list_new(mode='dev', step=sam, policy='nonlinearinv', sample_num=sam, context_dim=cdim)
+for sam in [50000]:
+    for cdim in [32]:
+        logit_impression_list_new(mode='dev', policy='nonlinearinv', sample_num=sam, context_dim=cdim)
+        random_impression_list(mode='dev', policy='nonlinearinv', sample_num=sam, context_dim=cdim)
 
-        random_impression_list(mode='dev', step=sam, policy='nonlinearinv', sample_num=sam, context_dim=cdim)
+

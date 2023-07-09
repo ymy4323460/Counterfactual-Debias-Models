@@ -14,12 +14,43 @@ def user_item_feature_withconfounder(context_dim=32, sample_size=128, item_size=
     return x, a, confounder
 
 
+def linear_impression_list(context_dim=32, impression_len=8, sample_size=128, item_size=16, step=10, mode='dev'):
+    x, a = user_item_feature(context_dim=context_dim, sample_size=sample_size, item_size=item_size)
+
+    user_feature_dict = dict(zip([j for j in range(sample_size)], list(x)))
+    item_feature_dict = dict(zip([j for j in range(item_size)], list(a)))
+    np.save('./lineardata/user', x)
+    np.save('./lineardata/item', a)
+    np.save('./lineardata/user_features', user_feature_dict)
+    np.save('./lineardata/item_features', item_feature_dict)
+    all_ = None
+    for i in range(step):
+        pair_matrix = torch.from_numpy(
+            np.dot(x, a.T) + np.random.normal(loc=0.0, scale=0.01, size=(sample_size, item_size)))
+        value, index = torch.topk(pair_matrix, impression_len, dim=1, largest=True, sorted=True, out=None)
+
+        user_feedback = np.zeros([sample_size, impression_len])
+        user_feedback[:, 0] = 1
+        impression_list = index.numpy()
+        assert impression_list.shape == user_feedback.shape
+        user_list = np.repeat(np.arange(sample_size).reshape([sample_size, 1]), impression_len, axis=1).reshape(-1, 1)
+        impression_list = impression_list.reshape(-1, 1)
+        impression_indicate = np.ones([sample_size, impression_len]).reshape(-1, 1)
+        user_feedback = user_feedback.reshape(-1, 1)
+        assert user_list.shape == impression_list.shape
+        batch = np.concatenate((user_list, impression_list, user_feedback, impression_indicate), axis=1)
+        if all_ is None:
+            all_ = batch
+        else:
+            all_ = np.concatenate((all_, batch), axis=0)
+    pd.DataFrame(all_).to_csv('./lineardata/{}/data_nonuniform.csv'.format(mode), header=False, index=False)
+    return all_, user_feature_dict, item_feature_dict
+
 
 def get_impression_feature(x, parameters=None):
-    # Todo: should make fixed name (nonliearlogitdata_) of dataset more flex
     item_feature_dict = np.load(
-        './nonliearlogitdata_{}_{}_{}/item_features.npy'.format(parameters[1], parameters[2], parameters[3]),
-        allow_pickle=True).item()
+        './nonliearlogitdata_{}_{}_{}_{}/item_features.npy'.format(parameters[1], parameters[2], parameters[3],
+                                                                   parameters[4]), allow_pickle=True).item()
     # print(item_feature_dict)
     # item_feature_dict = np.load('./lineardata/item_feature_dict.npy', allow_pickle=True).item()
     return item_feature_dict[x]
@@ -70,7 +101,7 @@ def nonlinear_reward_function(x, y, confounder, gamma=0.5):
         axis=(1, 2))
     # print(result)
     # exit()
-    # result = gamma*confounder + (1-gamma)*result
+#     result = gamma*confounder + (1-gamma)*result
     return np.where(sigmoid_fun(result) > 0.5, 1, 0)
 
 
@@ -98,9 +129,11 @@ def linear_reward_function(x, y):
     return np.where(sigmoid_fun(np.dot(x.reshape([1, x.shape[0]]), y.T)) > 0.5, 1, 0)
 
 
-def sample_from_multinomial(probability, impression_len=5, item_size=32):
+def sample_from_multinomial(probability, bs=0.2, impression_len=5, item_size=32):
     # print(probability)
-    probability = probability + np.abs(np.random.normal(loc=0.0, scale=0.2, size=(probability.shape)))
+    probability = (1 - bs) * (
+                probability + np.abs(np.random.normal(loc=0.0, scale=0.02, size=(probability.shape)))) + bs * (
+                              1. / item_size * np.ones(item_size))
     return np.random.choice(np.arange(item_size), size=impression_len, replace=False, p=probability / probability.sum())
     # return np.random.multinomial(impression_len, probability/probability.sum(), size=1)
 
@@ -124,27 +157,31 @@ def get_feedbacks(x, y, threshold=None):
 
 
 def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128, item_size=32, step=10, mode='dev',
-                              sample_num=50, policy='logit', gamma=0.):
-    sample_size = sample_num * 200
-    x, a, confounder = user_item_feature_withconfounder(context_dim=context_dim, sample_size=sample_num * 200,
+                              sample_num=50, policy='logit', gamma=0.5, bs=0.01):
+    sample_size = sample_num
+    x, a, confounder = user_item_feature_withconfounder(context_dim=context_dim, sample_size=sample_num,
                                                         item_size=item_size)
-    # if mode == 'train':
-    #     x = np.load('./{}data_{}_{}_{}/user.npy'.format(policy, sample_num, context_dim, gamma), allow_pickle=True)
-    #     # print(x)
-    #     a = np.load('./{}data_{}_{}_{}/item.npy'.format(policy, sample_num, context_dim, gamma), allow_pickle=True)
-    #     confounder = np.load('./{}data_{}_{}_{}/confounder.npy'.format(policy, sample_num, context_dim, gamma),
-    #                          allow_pickle=True)
+    if mode == 'train':
+        x = np.load('./{}data_{}_{}_{}_{}/user.npy'.format(policy, sample_num, context_dim, gamma, bs),
+                    allow_pickle=True)
+        # print(x)
+        a = np.load('./{}data_{}_{}_{}_{}/item.npy'.format(policy, sample_num, context_dim, gamma, bs),
+                    allow_pickle=True)
+        confounder = np.load('./{}data_{}_{}_{}_{}/confounder.npy'.format(policy, sample_num, context_dim, gamma, bs),
+                             allow_pickle=True)
     user_feature_dict = dict(zip([j for j in range(sample_size)], list(x)))
     item_feature_dict = dict(zip([j for j in range(item_size)], list(a)))
     # print(x)
-    if not os.path.exists('./nonliearlogitdata_{}_{}_{}/'.format(sample_num, context_dim, gamma)):  # 判断所在目录下是否有该文件名的文件夹
-        os.makedirs('./nonliearlogitdata_{}_{}_{}/dev/'.format(sample_num, context_dim, gamma))
-        os.makedirs('./nonliearlogitdata_{}_{}_{}/train/'.format(sample_num, context_dim, gamma))
-    np.save('./nonliearlogitdata_{}_{}_{}/user'.format(sample_num, context_dim, gamma), x)
-    np.save('./nonliearlogitdata_{}_{}_{}/item'.format(sample_num, context_dim, gamma), a)
-    np.save('./nonliearlogitdata_{}_{}_{}/confounder'.format(sample_num, context_dim, gamma), confounder)
-    np.save('./nonliearlogitdata_{}_{}_{}/user_features'.format(sample_num, context_dim, gamma), user_feature_dict)
-    np.save('./nonliearlogitdata_{}_{}_{}/item_features'.format(sample_num, context_dim, gamma), item_feature_dict)
+    if not os.path.exists('./nonliearlogitdata_{}_{}_{}_{}/'.format(sample_num, context_dim, gamma, bs)):  #
+        os.makedirs('./nonliearlogitdata_{}_{}_{}_{}/dev/'.format(sample_num, context_dim, gamma, bs))
+        os.makedirs('./nonliearlogitdata_{}_{}_{}_{}/train/'.format(sample_num, context_dim, gamma, bs))
+    np.save('./nonliearlogitdata_{}_{}_{}_{}/user'.format(sample_num, context_dim, gamma, bs), x)
+    np.save('./nonliearlogitdata_{}_{}_{}_{}/item'.format(sample_num, context_dim, gamma, bs), a)
+    np.save('./nonliearlogitdata_{}_{}_{}_{}/confounder'.format(sample_num, context_dim, gamma, bs), confounder)
+    np.save('./nonliearlogitdata_{}_{}_{}_{}/user_features'.format(sample_num, context_dim, gamma, bs),
+            user_feature_dict)
+    np.save('./nonliearlogitdata_{}_{}_{}_{}/item_features'.format(sample_num, context_dim, gamma, bs),
+            item_feature_dict)
     all_ = None
     for i in range(1):
         # impression_p = 1/(1+np.exp(-np.dot(x, a.T) ))#np.random.normal(loc=0.0, scale=0.01, size=(sample_size, item_size))
@@ -153,16 +190,17 @@ def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128,
             map(logit_policy, x, [a for j in range(sample_size)], confounder, [gamma for j in range(sample_size)])))
 
         # print(impression_p.shape)
-        # 获得impression list 的feature
+        #
         # print(impression_p[0].sum())
-        impression_list = np.array(list(map(sample_from_multinomial, impression_p)))
+        impression_list = np.array(
+            list(map(sample_from_multinomial, impression_p, [bs for j in range(impression_p.shape[0])])))
         # print(impression_list)
         impression_information = np.array(list(map(get_impression_feature, impression_list.reshape(-1),
-                                                   [['logit', sample_num, context_dim, gamma] for j in
+                                                   [['logit', sample_num, context_dim, gamma, bs] for j in
                                                     range(sample_size * impression_len)]))).reshape(
             [sample_size, impression_len, context_dim])
         # print(impression_list.reshape(-1))
-        # 用 true function 获得 result
+        #
         pair_matrix = np.array(list(map(nonlinear_reward_function_logit, x, impression_information, confounder,
                                         [gamma for j in range(sample_size)]))).reshape(sample_size, impression_len)
         # print(pair_matrix, pair_matrix.shape)
@@ -171,11 +209,11 @@ def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128,
                        torch.topk(torch.from_numpy(pair_matrix), 2, dim=1, largest=True, sorted=True, out=None)[
                            1].numpy()
         # print(value)
-        # value = np.where(value > 0.5, 1, 0)# 重要
-        # user_feedback = np.zeros([sample_size, impression_len]) #重要
+        # value = np.where(value > 0.5, 1, 0)#
+        # user_feedback = np.zeros([sample_size, impression_len]) #
         # assert index.shape[0] == user_feedback.shape[0]
         user_feedback = np.where(pair_matrix > 0.5, 1, 0)
-        # user_feedback = np.array(list(map(get_feedbacks, user_feedback, index, value))) #重要
+        # user_feedback = np.array(list(map(get_feedbacks, user_feedback, index, value)))
         # print(user_feedback)
 
         assert impression_list.shape == user_feedback.shape
@@ -192,41 +230,40 @@ def logit_impression_list_new(context_dim=32, impression_len=5, sample_size=128,
         else:
             all_ = np.concatenate((all_, batch), axis=0)
         # print(batch)
-
-    if not os.path.exists('./nonliearlogitdata_{}_{}_{}/'.format(sample_num, context_dim, gamma)):  # 判断所在目录下是否有该文件名的文件夹
-        os.makedirs('./nonliearlogitdata_{}_{}_{}/dev/'.format(sample_num, context_dim, gamma))
-        os.makedirs('./nonliearlogitdata_{}_{}_{}/train/'.format(sample_num, context_dim, gamma))
+    if not os.path.exists('./nonliearlogitdata_{}_{}_{}_{}/'.format(sample_num, context_dim, gamma, bs)):  #
+        os.makedirs('./nonliearlogitdata_{}_{}_{}_{}/dev/'.format(sample_num, context_dim, gamma, bs))
+        os.makedirs('./nonliearlogitdata_{}_{}_{}_{}/train/'.format(sample_num, context_dim, gamma, bs))
     partition = int(0.75 * all_.shape[0])
     pd.DataFrame(all_[: partition]).to_csv(
-        './nonliearlogitdata_{}_{}_{}/dev/data_nonuniform.csv'.format(sample_num, context_dim, gamma), header=False,
-        index=False)
+        './nonliearlogitdata_{}_{}_{}_{}/dev/data_nonuniform.csv'.format(sample_num, context_dim, gamma, bs),
+        header=False, index=False)
     pd.DataFrame(all_[partition:]).to_csv(
-        './nonliearlogitdata_{}_{}_{}/train/data_nonuniform.csv'.format(sample_num, context_dim, gamma), header=False,
-        index=False)
+        './nonliearlogitdata_{}_{}_{}_{}/train/data_nonuniform.csv'.format(sample_num, context_dim, gamma, bs),
+        header=False, index=False)
     return all_, user_feature_dict, item_feature_dict
 
 
-def random_impression_list(context_dim=32, impression_len=5, sample_size=128, item_size=32, step=10, mode='dev',
-                           policy='logit', sample_num=50, gamma=0.5):
-    sample_size = sample_num * 200
-    x = np.load('./{}data_{}_{}_{}/user.npy'.format(policy, sample_num, context_dim, gamma), allow_pickle=True)
-    # print(x)
-    a = np.load('./{}data_{}_{}_{}/item.npy'.format(policy, sample_num, context_dim, gamma), allow_pickle=True)
-    confounder = np.load('./{}data_{}_{}_{}/confounder.npy'.format(policy, sample_num, context_dim, gamma),
+def random_impression_list(context_dim=32, impression_len=10, sample_size=128, item_size=32, step=10, mode='dev',
+                           policy='logit', sample_num=50, gamma=0.5, bs=0.01):
+    sample_size = sample_num
+    x = np.load('./{}data_{}_{}_{}_{}/user.npy'.format(policy, sample_num, context_dim, gamma, bs), allow_pickle=True)
+    # print(x)_{}
+    a = np.load('./{}data_{}_{}_{}_{}/item.npy'.format(policy, sample_num, context_dim, gamma, bs), allow_pickle=True)
+    confounder = np.load('./{}data_{}_{}_{}_{}/confounder.npy'.format(policy, sample_num, context_dim, gamma, bs),
                          allow_pickle=True)
     all_ = None
     for i in range(1):
-        # 随机采样出来一组item
+        #
         # impression_list = np.random.randint(0, high = item_size, size = (sample_size, impression_len), dtype = 'l')
         impression_list = np.array(list(map(random_policy, [impression_len for j in range(sample_size)])))
-        # 获得impression list 的feature
+        #
         # print(impression_list)
         impression_information = np.array(list(map(get_impression_feature, impression_list.reshape(-1),
-                                                   [[policy, sample_num, context_dim, gamma] for j in
+                                                   [[policy, sample_num, context_dim, gamma, bs] for j in
                                                     range(sample_size * impression_len)]))).reshape(
             [sample_size, impression_len, context_dim])
         # print(x.shape)
-        # 获得 result
+        #
         pair_matrix = np.array(list(map(nonlinear_reward_function, x, impression_information, confounder,
                                         [gamma for j in range(sample_size)]))).reshape(impression_list.shape)
         # print(pair_matrix.shape, impression_list.shape)
@@ -250,10 +287,10 @@ def random_impression_list(context_dim=32, impression_len=5, sample_size=128, it
 
     partition = int(0.75 * all_.shape[0])
     pd.DataFrame(all_[: partition]).to_csv(
-        './{}data_{}_{}_{}/dev/data_uniform.csv'.format(policy, sample_num, context_dim, gamma), header=False,
+        './{}data_{}_{}_{}_{}/dev/data_uniform.csv'.format(policy, sample_num, context_dim, gamma, bs), header=False,
         index=False)
     pd.DataFrame(all_[partition:]).to_csv(
-        './{}data_{}_{}_{}/train/data_uniform.csv'.format(policy, sample_num, context_dim, gamma), header=False,
+        './{}data_{}_{}_{}_{}/train/data_uniform.csv'.format(policy, sample_num, context_dim, gamma, bs), header=False,
         index=False)
 
     return all_  # , user_feature_dict, item_feature_dict
@@ -261,13 +298,14 @@ def random_impression_list(context_dim=32, impression_len=5, sample_size=128, it
 
 for sam in [10]:
     for cdim in [32]:
-        # The confonder influenced
         for gm in [0.5]:
-            # bias 
-            for bs in [0, 0.01, 0.1, 0.5, 1]
-                logit_impression_list_new(mode='train', step=sam, policy='nonliearlogit', sample_num=sam,
-                                          context_dim=cdim, gamma=gm)
+            for bs in [0.5]:
+                logit_impression_list_new(mode='dev', step=sam, policy='nonliearlogit', sample_num=sam,
+                                          context_dim=cdim, gamma=gm, bs=bs)
 
-            random_impression_list(mode='dev', step=sam, policy='nonliearlogit', sample_num=sam, context_dim=cdim,
-                                   gamma=gm)
-       
+                random_impression_list(mode='dev', step=sam, policy='nonliearlogit', sample_num=sam, context_dim=cdim,
+                                       gamma=gm, bs=bs)
+
+
+
+
