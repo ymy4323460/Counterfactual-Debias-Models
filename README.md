@@ -83,8 +83,8 @@ for sam in [50000]:
 
 In the advanced generation code "<span style="background-color: yellow;">data_simulator_with_confounder_bias.py</span>", you can specify two additional parameters:
 
--"bs" represents the degree of bias, where a larger value indicates a lower level of bias in the impression list.
--"gm" represents the degree of confounding interference, where a smaller value indicates a lower level of interference from confounders.
+- "bs" represents the degree of bias, where a larger value indicates a lower level of bias in the impression list.
+- "gm" represents the degree of confounding interference, where a smaller value indicates a lower level of interference from confounders.
 
 <pre>
 ```python
