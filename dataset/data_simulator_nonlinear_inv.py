@@ -271,59 +271,5 @@ def random_impression_list(context_dim=32, impression_len=5, sample_size=128, it
 for sam in [25, 50]:
     for cdim in [16, 32]:
         logit_impression_list_new(mode='dev', step=sam, policy='nonlinearinv', sample_num=sam, context_dim=cdim)
-        # logit_impression_list_new(mode='train', step=10, sample_num=sam, context_dim=cdim)
-
-        # linear_impression_list(mode='dev', step=30)
-        # linear_impression_list(mode='train', step=5)
 
         random_impression_list(mode='dev', step=sam, policy='nonlinearinv', sample_num=sam, context_dim=cdim)
-        # random_impression_list(mode='train', step=10, policy='nonlinearinv', sample_num=sam, context_dim=cdim)
-
-# random_impression_list(mode='dev', step=30, policy='linear')
-# random_impression_list(mode='train', step=5, policy='linear')
-
-
-# def logit_impression_list(context_dim=32, impression_len=8, sample_size=256, item_size=16, step=10, mode='dev'):
-#     x, a = user_item_feature(context_dim=context_dim, sample_size=sample_size, item_size=item_size)
-#     user_feature_dict = dict(zip([j for j in range(sample_size)], list(x)))
-#     item_feature_dict = dict(zip([j for j in range(item_size)], list(a)))
-#     # print(user_feature_dict)
-#     np.save('./logitdata/user', x)
-#     np.save('./logitdata/item', a)
-#     np.save('./logitdata/user_features', user_feature_dict)
-#     np.save('./logitdata/item_features', item_feature_dict)
-#     all_ = None
-#     for i in range(step):
-#         impression_p = 1/(1+np.exp(-np.dot(x, a.T)))#np.random.normal(loc=0.0, scale=0.01, size=(sample_size, item_size))
-#         # 获得impression list 的feature
-#         # print(impression_p[0].sum())
-#         impression_list = np.array(list(map(sample_from_multinomial, list(impression_p))))
-#         # print(impression_list.shape)
-#         impression_information = np.array(list(map(get_impression_feature, impression_list.reshape(-1), ['logit' for j in range(sample_size*impression_len)]))).reshape([sample_size, impression_len, context_dim])
-#         # print(impression_information.shape)
-#         # 获得 result
-#         pair_matrix = np.array(list(map(cal_similarity, x, impression_information))).reshape(sample_size, impression_len)
-#         # print(pair_matrix, pair_matrix.shape)
-#         index = torch.topk(torch.from_numpy(pair_matrix), 2, dim=1, largest=True, sorted=True, out=None)[1].numpy()
-#         # print(index.shape)
-#         user_feedback = np.zeros([sample_size, impression_len])
-#         assert index.shape[0] == user_feedback.shape[0]
-#         user_feedback = np.array(list(map(get_feedbacks, user_feedback, index)))
-#         # print(user_feedback)
-
-#         assert impression_list.shape == user_feedback.shape
-#         user_list = np.repeat(np.arange(sample_size).reshape([sample_size, 1]), impression_len, axis=1).reshape(-1,1)
-#         # print(user_list)
-#         impression_list = impression_list.reshape(-1,1)
-#         impression_indicate = np.ones([sample_size, impression_len]).reshape(-1,1)
-#         user_feedback = user_feedback.reshape(-1,1)
-#         assert user_list.shape == impression_list.shape
-#         # print(user_list.shape, impression_list.shape, impression_indicate.shape, user_feedback.shape)
-#         batch = np.concatenate((user_list, impression_list, user_feedback, impression_indicate), axis=1)
-#         if all_ is None:
-#             all_ = batch
-#         else:
-#             all_ = np.concatenate((all_, batch), axis=0)
-#         # print(batch)
-#     pd.DataFrame(all_).to_csv('./logitdata_{}_{}/{}/data_nonuniform.csv'.format(step, context_dim, mode), header=False, index=False)
-#     return all_, user_feature_dict, item_feature_dict

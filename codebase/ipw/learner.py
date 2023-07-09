@@ -232,7 +232,6 @@ class Learner(nn.Module):
                 a_u = torch.tensor(a_u, dtype=torch.int64).to(device).reshape([a_u.size()[0], 1])
                 y_u = torch.tensor(y_u, dtype=torch.int64).to(device)
         elif test:
-            # print('xxxxxxxx')
             if not self.args.feature_data:
                 x_u = torch.tensor(x, dtype=torch.int64).to(device).reshape([y.size()[0], 1])
                 a_u = torch.tensor(a, dtype=torch.int64).to(device).reshape([y.size()[0], 1])

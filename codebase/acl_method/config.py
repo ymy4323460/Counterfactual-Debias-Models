@@ -41,6 +41,7 @@ parser.add_argument('--item_emb_dim', type=int, default=64, help="Item embedding
 parser.add_argument('--ctr_layer_dims',  type=int, nargs='+', default=[64, 32, 16],   help="Hidden layer dimension of ctr prediction model")
 parser.add_argument('--debias_mode',  type=str, default='Propensitylearnt_Mode', choices=['Pretrain','Propensity_Mode','SNIPS_Mode','Propensitylearnt_Mode', 'SNIPSlearnt_Mode','Direct', 'DoublyRobust_Mode', 'Propensity_DR_Mode', 'Uniform_DR_Mode', 'CVIB', 'ATT', 'ACL'], help="The mode of weight")
 parser.add_argument('--pretrain_mode',  type=str, default='propensity', choices=['propensity','imputation','uniform_imputation'], help="The mode of weight")
+parser.add_argument('--impression_len', type=int, default=5, help="The impression length")
 
 # new added
 parser.add_argument('--weight_decay', type=float, default=0.001, help="weight_decay in BPR model")

@@ -37,7 +37,7 @@ else:
     dataset_dir = os.path.join(workstation_path, 'dataset', args.dataset, 'train', 'train.csv')
     test_dataset_dir = os.path.join(workstation_path, 'dataset', args.dataset, 'dev', 'dev.csv')
 # dataset_dir = os.path.join(workstation_path, 'dataset', args.dataset, 'train', 'train.csv')
-propensity_dir = os.path.join(workstation_path, 'dataset', 'coat', 'propensity.ascii')
+
 imputation_dir = os.path.join(workstation_path, 'dataset', args.dataset, 'imputation.csv')
 # test_dataset_dir = os.path.join(workstation_path, 'dataset', args.dataset, 'dev', 'dev.csv')
 model = Learner(args)
@@ -47,7 +47,6 @@ else:
     data_feature_path = None
 user_dic, item_dic = np.load(os.path.join(data_feature_path, 'user_features.npy'), allow_pickle=True).item(), np.load(
     os.path.join(data_feature_path, 'item_features.npy'), allow_pickle=True).item()
-# print(data_feature_path,'xxxxxxxxxxxxxx', args.feature_data)
 # dataset_dir, batch_size, shuffle=False, num_workers=8, pin_memory=True, propensity=None, imputation=None,data_feature_path=None
 if args.debias_mode in ['Pretrain']:
     if args.pretrain_mode == "uniform_imputation":
@@ -57,25 +56,30 @@ if args.debias_mode in ['Pretrain']:
     pretrain_dataloader = dataload.pretrain_dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path,
                                                      pretrain_mode=args.pretrain_mode, syn=True)
 elif args.debias_mode in ['Propensity_Mode']:
+    # If the data provide propensity score directly we choose this mode, currently only the dataset coat provide propensity score.
+    propensity_dir = os.path.join(workstation_path, 'dataset', 'coat', 'propensity.ascii')
     train_dataloader = dataload.dataload(dataset_dir, args.batch_size, propensity=propensity_dir,
-                                         data_feature_path=data_feature_path, Flag=False, shuffle=True)
+                                         data_feature_path=data_feature_path, shuffle=True)
+
 elif args.debias_mode in ['DoublyRobust_Mode']:
+    # If the data provide propensity score directly we choose this mode, currently only the dataset coat provide propensity score.
+    propensity_dir = os.path.join(workstation_path, 'dataset', 'coat', 'propensity.ascii')
     train_dataloader = dataload.dataload(dataset_dir, args.batch_size, propensity=propensity_dir,
-                                         data_feature_path=data_feature_path, Flag=False, shuffle=True)
+                                         data_feature_path=data_feature_path, shuffle=True)
+
 elif args.debias_mode in ['Direct', 'Propensity_DR_Mode']:
-    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, Flag=False, shuffle=True)
+    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, shuffle=True)
 elif args.debias_mode in ['Uniform_DR_Mode']:
-    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, Flag=False, shuffle=True)
+    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, shuffle=True)
 # train_dataloader = dataload.dataload(dataset_dir, args.batch_size, imputation=os.path.join(workstation_path, 'dataset', 'yahoo', 'uniformimputation.csv'), data_feature_path=data_feature_path)
 else:
     # pretrain_dataloader = dataload.dataload(dataset_dir, args.batch_size)
-    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, Flag=False, shuffle=True)
+    train_dataloader = dataload.dataload(dataset_dir, args.batch_size, data_feature_path=data_feature_path, shuffle=True)
 if args.debias_mode in ['Pretrain']:
     test_dataloader = dataload.pretrain_dataload(test_dataset_dir, 1000, data_feature_path=data_feature_path,
                                                  pretrain_mode=args.pretrain_mode, shuffle=False, syn=True)
 else:
-    test_dataloader = dataload.dataload(test_dataset_dir, 1000, data_feature_path=data_feature_path,
-                                        Flag=False, shuffle=False)
+    test_dataloader = dataload.dataload(test_dataset_dir, 1000, data_feature_path=data_feature_path, shuffle=False)
 
 print("=======================")
 print(len(test_dataloader))
@@ -151,15 +155,7 @@ if args.train_mode == 'pretrain':
             print("Epoch:{}\n test_auc:{}, test_acc:{}, test_logloss:{}".format(epoch, test_total_auc / test_m, \
                                                                                 test_total_acc / test_m, \
                                                                                 total_test_logloss / test_m))
-elif args.train_mode == 'save_imputation':
-    imputation_data_dir = os.path.join(workstation_path, 'dataset', 'coat')
-    imputation_model = model.imputation
-    save_imputation_data.imputation(args.user_size, args.item_size, imputation_data_dir, imputation_model)
 
-    uni_imputation_data_dir = os.path.join(workstation_path, 'dataset', 'coat')
-    uni_imputation_model = model.unbias_imputation
-    save_imputation_data.imputation(args.user_size, args.item_size, imputation_data_dir, uni_imputation_model,
-                                    uniform=True)
 elif args.train_mode == 'train':
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, betas=(0.9, 0.999))
 
@@ -177,6 +173,7 @@ elif args.train_mode == 'train':
         save_flag = True
         if args.debias_mode in ['Propensity_Mode']:
             for x, a, y, r, w in train_dataloader:
+
                 optimizer.zero_grad()
                 x, a, y, r, w = x.to(device), a.to(device), y.to(device), r.to(device), w.to(device)
                 loss = model.learn(x, a, r, y, w=w, savestep=epoch, save_flag=save_flag)
@@ -200,14 +197,12 @@ elif args.train_mode == 'train':
                 m = len(train_dataloader)
         elif args.debias_mode in ['Direct', 'Propensity_DR_Mode', 'Uniform_DR_Mode', 'Propensitylearnt_Mode',
                                   'SNIPSlearnt_Mode', 'CVIB', 'ATT']:
-            count = 0
             for x, a, y, r, a_propensity in train_dataloader:
+                print('the propensity is--------', a_propensity)
                 optimizer.zero_grad()
-                count += 1
                 x_u, a_u, y_u = model.data_sampler_feature(x.size()[0], user_dic, item_dic)
                 x, a, y, r, x_u, a_u, y_u, a_propensity = x.to(device), a.to(device), y.to(device), r.to(
                     device), x_u.to(device), a_u.to(device), y_u.to(device), a_propensity.to(device)
-                # print(x_u.size(), count)
                 loss = model.learn(x, a, r, y, x_u, a_u, y_u, a_propensity=a_propensity, savestep=epoch,
                                    save_flag=save_flag)
                 save_flag = False
@@ -248,17 +243,12 @@ elif args.train_mode == 'train':
                                                           np.zeros_like(test_y_pred)))
                 test_logloss = skm.log_loss(test_y.cpu().detach().numpy(), test_y_pred)
 
-                if args.dataset == 'coat':
-                    top20 = np.repeat(np.sort(test_y_pred.reshape(-1, 16))[:, 5].reshape(-1, 1), 16, axis=1).reshape(-1)
-                    test_ndcg = skm.ndcg_score(test_y.reshape(-1, 16), test_y_pred.reshape(-1, 16), k=10)
-                else:
-                    top20 = np.repeat(np.sort(test_y_pred.reshape(-1, 10))[:, 5].reshape(-1, 1), 10, axis=1).reshape(-1)
-                    test_ndcg = skm.ndcg_score(test_y.reshape(-1, 10), test_y_pred.reshape(-1, 1), k=10)
-#                     print(test_ndcg)
+                top = np.repeat(np.sort(test_y_pred.reshape(-1, args.impression_len))[:, 3].reshape(-1, 1), args.impression_len, axis=1).reshape(-1)
+                test_ndcg = skm.ndcg_score(test_y.reshape(-1, args.impression_len), test_y_pred.reshape(-1, args.impression_len), k=args.impression_len)
 
-                test_pre = skm.precision_score(test_y.cpu().numpy(), np.where(test_y_pred > top20, np.ones_like(test_y_pred),
+                test_pre = skm.precision_score(test_y.cpu().numpy(), np.where(test_y_pred > top, np.ones_like(test_y_pred),
                                                                       np.zeros_like(test_y_pred)))
-                test_rec = skm.recall_score(test_y.cpu().numpy(), np.where(test_y_pred > top20, np.ones_like(test_y_pred),
+                test_rec = skm.recall_score(test_y.cpu().numpy(), np.where(test_y_pred > top, np.ones_like(test_y_pred),
                                                                       np.zeros_like(test_y_pred)))
 
                 total_test_auc += test_auc
